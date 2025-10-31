@@ -6,21 +6,38 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "xo",
+    "lint:fix": "xo --fix"
   },
   "dependencies": {
+    "next": "16.0.1",
     "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "next": "16.0.1"
+    "react-dom": "19.2.0"
   },
   "devDependencies": {
-    "typescript": "^5",
-    "@types/node": "^20",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "24.9.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
     "eslint": "^9",
-    "eslint-config-next": "16.0.1"
+    "eslint-config-next": "16.0.1",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "xo": "^1.2.3"
+  },
+  "xo": {
+    "rules": {
+      "react/react-in-jsx-scope": "off",
+      "capitalized-comments": "off",
+      "import/extensions": "off",
+      "n/file-extension-in-import": "off",
+      "new-cap": "off"
+    },
+    "ignores": [
+      "node_modules",
+      ".next",
+      "out",
+      "public"
+    ]
   }
 }
