@@ -33,7 +33,8 @@
       "capitalized-comments": "off",
       "import-x/extensions": "off",
       "n/file-extension-in-import": "off",
-      "new-cap": "off"
+      "new-cap": "off",
+      "@typescript-eslint/naming-convention": "off"
     },
     "ignores": [
       "node_modules",
