@@ -1,4 +1,6 @@
-// WebAuthn登録用のオプションを生成する
+/**
+ * WebAuthn登録用のオプションを生成する
+ */
 
 import {generateRegistrationOptions} from '@simplewebauthn/server';
 import {NextResponse} from 'next/server';
