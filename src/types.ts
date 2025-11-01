@@ -14,10 +14,10 @@ export type registrationVerifyResponse = {
 };
 
 export type Log = {
-  timestamp: string
-  type: 'request' | 'response'
-  endpoint: string
-  status?: number
-  data: unknown
-}
+  timestamp: string;
+  type: 'request' | 'response';
+  endpoint: string;
+  status?: number;
+  data: unknown;
+};
 

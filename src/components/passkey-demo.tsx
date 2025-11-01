@@ -9,8 +9,8 @@ import {
   type PublicKeyCredentialRequestOptionsJSON,
   type RegistrationResponseJSON,
 } from '@simplewebauthn/browser';
-import {Log, type registrationVerifyResponse} from '@/types';
 import LogViewer from './log';
+import {type Log, type registrationVerifyResponse} from '@/types';
 
 type Status = 'idle' | 'registering' | 'authenticating';
 
@@ -19,10 +19,20 @@ export default function PasskeyDemo() {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState<string>('Ready to use passkeys');
 
-  const [dataLogs, setDataLogs] = useState<Log[]>([])
+  const [dataLogs, setDataLogs] = useState<Log[]>([]);
 
-  // ログにデータを追加するヘルパー関数
-  const addLog = useCallback((type: 'request' | 'response', endpoint: string, data: unknown, status?: number) => {
+  // ログにデータを追加するヘルパー関数（Promiseも受け取り可能）
+  const addLog = useCallback(async (type: 'request' | 'response', endpoint: string, data: unknown | Promise<unknown>, status?: number) => {
+    let resolvedData = data;
+    // dataがPromiseの場合は解決し、エラー時はnullを使用
+    if (data instanceof Promise) {
+      try {
+        resolvedData = await data;
+      } catch {
+        resolvedData = null;
+      }
+    }
+
     setDataLogs((prev) => [
       ...prev,
       {
@@ -30,7 +40,7 @@ export default function PasskeyDemo() {
         type,
         endpoint,
         status,
-        data,
+        data: resolvedData,
       },
     ])
   }, [])
@@ -41,34 +51,42 @@ export default function PasskeyDemo() {
     setMessage('Generating registration options...');
 
     try {
+      // 1. サーバーから登録用のチャレンジ情報を取得
       const optionsResponse = await fetch('/api/registration/options', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
       });
-      addLog('request', '/api/registration/options', {method: 'POST'});
+
       if (!optionsResponse.ok) {
-        addLog('response', '/api/registration/options', await optionsResponse.json().catch(() => null), optionsResponse.status);
+        await addLog('response', '/api/registration/options', optionsResponse.json(), optionsResponse.status);
         throw new Error('Failed to fetch registration options');
       }
-      addLog('response', '/api/registration/options', await optionsResponse.clone().json().catch(() => null), optionsResponse.status);
+
+      await addLog('response', '/api/registration/options', optionsResponse.clone().json(), optionsResponse.status);
       setMessage('Waiting for authenticator...');
 
+      // 2. ブラウザのWebAuthn APIで認証器を使って署名を作成
       const options = (await optionsResponse.json()) as PublicKeyCredentialCreationOptionsJSON;
       const attestationResponse = await startRegistration({optionsJSON: options});
-      addLog('response', 'navigator.credentials.create', attestationResponse);
+      await addLog('response', 'navigator.credentials.create', attestationResponse);
+
+      // 3. サーバーで署名を検証してPasskeyを保存
       const verificationResponse = await fetch('/api/registration/verify', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(attestationResponse satisfies RegistrationResponseJSON),
       });
-      addLog('request', '/api/registration/verify', attestationResponse);
+
+      await addLog('request', '/api/registration/verify', attestationResponse);
+
       if (!verificationResponse.ok) {
-        addLog('response', '/api/registration/verify', await verificationResponse.json().catch(() => null), verificationResponse.status);
+        await addLog('response', '/api/registration/verify', verificationResponse.json(), verificationResponse.status);
         throw new Error('Failed to verify registration response');
       }
 
+      // 4. 検証結果を確認
       const verification = (await verificationResponse.json()) as registrationVerifyResponse;
-      addLog('response', '/api/registration/verify', verification, verificationResponse.status);
+      await addLog('response', '/api/registration/verify', verification, verificationResponse.status);
 
       if (verification.verified) {
         const username = verification.user?.username ?? 'demo user';
@@ -77,7 +95,7 @@ export default function PasskeyDemo() {
         setMessage('Authentication failed, please try again');
       }
     } catch (error) {
-      addLog('response', '/api/registration/verify', {error: error instanceof Error ? error.message : String(error)});
+      await addLog('response', '/api/registration/verify', {error: error instanceof Error ? error.message : String(error)});
       setMessage(error instanceof Error ? error.message : 'Registration failed unexpectedly');
     } finally {
       setStatus('idle');
@@ -90,38 +108,44 @@ export default function PasskeyDemo() {
     setMessage('Generating authentication options...');
 
     try {
+      // 1. サーバーから認証用のチャレンジ情報を取得
       const optionsResponse = await fetch('/api/authentication/options', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
       });
-      addLog('request', '/api/authentication/options', {method: 'POST'});
+
+      await addLog('request', '/api/authentication/options', {method: 'POST'});
 
       if (!optionsResponse.ok) {
-        addLog('response', '/api/authentication/options', await optionsResponse.json().catch(() => null), optionsResponse.status);
+        await addLog('response', '/api/authentication/options', optionsResponse.json(), optionsResponse.status);
         throw new Error('Failed to fetch authentication options');
       }
 
       const options = (await optionsResponse.json()) as PublicKeyCredentialRequestOptionsJSON;
-      addLog('response', '/api/authentication/options', options, optionsResponse.status);
+      await addLog('response', '/api/authentication/options', options, optionsResponse.status);
       setMessage('Waiting for authenticator...');
 
+      // 2. ブラウザのWebAuthn APIで保存済みPasskeyを使って署名
       const assertionResponse = await startAuthentication({optionsJSON: options});
-      addLog('response', 'navigator.credentials.get', assertionResponse);
+      await addLog('response', 'navigator.credentials.get', assertionResponse);
 
+      // 3. サーバーで署名を検証してユーザーを認証
       const verificationResponse = await fetch('/api/authentication/verify', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(assertionResponse satisfies AuthenticationResponseJSON),
       });
-      addLog('request', '/api/authentication/verify', assertionResponse);
+
+      await addLog('request', '/api/authentication/verify', assertionResponse);
 
       if (!verificationResponse.ok) {
-        addLog('response', '/api/authentication/verify', await verificationResponse.json().catch(() => null), verificationResponse.status);
+        await addLog('response', '/api/authentication/verify', verificationResponse.json(), verificationResponse.status);
         throw new Error('Failed to verify authentication response');
       }
 
+      // 4. 検証結果を確認
       const verification = (await verificationResponse.json()) as registrationVerifyResponse;
-      addLog('response', '/api/authentication/verify', verification, verificationResponse.status);
+      await addLog('response', '/api/authentication/verify', verification, verificationResponse.status);
 
       if (verification.verified) {
         const username = verification.user?.username ?? 'demo user';
@@ -131,7 +155,7 @@ export default function PasskeyDemo() {
       }
     } catch (error) {
       console.error('Authentication error:', error);
-      addLog('response', '/api/authentication/verify', {error: error instanceof Error ? error.message : String(error)});
+      await addLog('response', '/api/authentication/verify', {error: error instanceof Error ? error.message : String(error)});
       setMessage(error instanceof Error ? error.message : 'Authentication failed unexpectedly');
     } finally {
       setStatus('idle');
